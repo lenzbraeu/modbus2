@@ -16,18 +16,19 @@ type ClientHandler interface {
 }
 
 type client struct {
+	slaveID     byte
 	packager    Packager
 	transporter Transporter
 }
 
 // NewClient creates a new modbus client with given backend handler.
-func NewClient(handler ClientHandler) Client {
-	return &client{packager: handler, transporter: handler}
+func NewClient(slaveID byte, handler ClientHandler) Client {
+	return &client{slaveID: slaveID, packager: handler, transporter: handler}
 }
 
 // NewClient2 creates a new modbus client with given backend packager and transporter.
-func NewClient2(packager Packager, transporter Transporter) Client {
-	return &client{packager: packager, transporter: transporter}
+func NewClient2(slaveID byte, packager Packager, transporter Transporter) Client {
+	return &client{slaveID: slaveID, packager: packager, transporter: transporter}
 }
 
 // Request:
@@ -436,7 +437,7 @@ func (mb *client) ReadFIFOQueue(address uint16) (results []byte, err error) {
 
 // send sends request and checks possible exception in the response.
 func (mb *client) send(request *ProtocolDataUnit) (response *ProtocolDataUnit, err error) {
-	aduRequest, err := mb.packager.Encode(request)
+	aduRequest, err := mb.packager.Encode(mb.slaveID, request)
 	if err != nil {
 		return
 	}

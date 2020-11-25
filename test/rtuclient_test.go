@@ -7,20 +7,25 @@ package test
 import (
 	"log"
 	"os"
+	"sync"
 	"testing"
 
-	"github.com/goburrow/modbus"
+	modbus "go.lenzbraeu.de/modbus2"
 )
 
 const (
-	rtuDevice = "/dev/pts/6"
+	rtuDevice = "/dev/pts/2"
 )
 
 func TestRTUClient(t *testing.T) {
 	// Diagslave does not support broadcast id.
 	handler := modbus.NewRTUClientHandler(rtuDevice)
-	handler.SlaveId = 17
-	ClientTestAll(t, modbus.NewClient(handler))
+	ClientTestAll(t, modbus.NewClient(17, handler))
+}
+
+type result struct {
+	bytes []byte
+	err   error
 }
 
 func TestRTUClientAdvancedUsage(t *testing.T) {
@@ -29,7 +34,6 @@ func TestRTUClientAdvancedUsage(t *testing.T) {
 	handler.DataBits = 8
 	handler.Parity = "E"
 	handler.StopBits = 1
-	handler.SlaveId = 11
 	handler.Logger = log.New(os.Stdout, "rtu: ", log.LstdFlags)
 	err := handler.Connect()
 	if err != nil {
@@ -37,13 +41,42 @@ func TestRTUClientAdvancedUsage(t *testing.T) {
 	}
 	defer handler.Close()
 
-	client := modbus.NewClient(handler)
-	results, err := client.ReadDiscreteInputs(15, 2)
-	if err != nil || results == nil {
-		t.Fatal(err, results)
+	var wg sync.WaitGroup
+	results := make(chan result)
+	slaveIDs := []byte{
+		11,
+		24,
+		32,
+		47,
 	}
-	results, err = client.ReadWriteMultipleRegisters(0, 2, 2, 2, []byte{1, 2, 3, 4})
-	if err != nil || results == nil {
-		t.Fatal(err, results)
+
+	for _, slaveID := range slaveIDs {
+		client := modbus.NewClient(slaveID, handler)
+
+		wg.Add(1)
+		go func(slaveID byte) {
+			bytes, err := client.ReadDiscreteInputs(15, 2)
+			results <- result{bytes, err}
+			wg.Done()
+		}(slaveID)
+
+		wg.Add(1)
+		go func(slaveID byte) {
+			bytes, err := client.ReadWriteMultipleRegisters(0, 2, 2, 2, []byte{1, 2, 3, 4})
+			results <- result{bytes, err}
+			wg.Done()
+		}(slaveID)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for r := range results {
+		log.Printf("r: %+v", r)
+		if r.err != nil || r.bytes == nil {
+			t.Fatal(r.err, r.bytes)
+		}
 	}
 }

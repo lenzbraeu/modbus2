@@ -9,18 +9,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/goburrow/modbus"
+	modbus "go.lenzbraeu.de/modbus2"
 )
 
 const (
-	asciiDevice = "/dev/pts/6"
+	asciiDevice = "/dev/pts/2"
 )
 
 func TestASCIIClient(t *testing.T) {
 	// Diagslave does not support broadcast id.
 	handler := modbus.NewASCIIClientHandler(asciiDevice)
-	handler.SlaveId = 17
-	ClientTestAll(t, modbus.NewClient(handler))
+	ClientTestAll(t, modbus.NewClient(17, handler))
 }
 
 func TestASCIIClientAdvancedUsage(t *testing.T) {
@@ -29,7 +28,7 @@ func TestASCIIClientAdvancedUsage(t *testing.T) {
 	handler.DataBits = 8
 	handler.Parity = "E"
 	handler.StopBits = 1
-	handler.SlaveId = 12
+
 	handler.Logger = log.New(os.Stdout, "ascii: ", log.LstdFlags)
 	err := handler.Connect()
 	if err != nil {
@@ -37,7 +36,7 @@ func TestASCIIClientAdvancedUsage(t *testing.T) {
 	}
 	defer handler.Close()
 
-	client := modbus.NewClient(handler)
+	client := modbus.NewClient(12, handler)
 	results, err := client.ReadDiscreteInputs(15, 2)
 	if err != nil || results == nil {
 		t.Fatal(err, results)

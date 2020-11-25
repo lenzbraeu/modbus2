@@ -34,22 +34,20 @@ func NewRTUClientHandler(address string) *RTUClientHandler {
 }
 
 // RTUClient creates RTU client with default handler and given connect string.
-func RTUClient(address string) Client {
+func RTUClient(slaveID byte, address string) Client {
 	handler := NewRTUClientHandler(address)
-	return NewClient(handler)
+	return NewClient(slaveID, handler)
 }
 
 // rtuPackager implements Packager interface.
-type rtuPackager struct {
-	SlaveId byte
-}
+type rtuPackager struct{}
 
 // Encode encodes PDU in a RTU frame:
 //  Slave Address   : 1 byte
 //  Function        : 1 byte
 //  Data            : 0 up to 252 bytes
 //  CRC             : 2 byte
-func (mb *rtuPackager) Encode(pdu *ProtocolDataUnit) (adu []byte, err error) {
+func (mb *rtuPackager) Encode(slaveID byte, pdu *ProtocolDataUnit) (adu []byte, err error) {
 	length := len(pdu.Data) + 4
 	if length > rtuMaxSize {
 		err = fmt.Errorf("modbus: length of data '%v' must not be bigger than '%v'", length, rtuMaxSize)
@@ -57,7 +55,7 @@ func (mb *rtuPackager) Encode(pdu *ProtocolDataUnit) (adu []byte, err error) {
 	}
 	adu = make([]byte, length)
 
-	adu[0] = mb.SlaveId
+	adu[0] = slaveID
 	adu[1] = pdu.FunctionCode
 	copy(adu[2:], pdu.Data)
 
@@ -111,6 +109,9 @@ type rtuSerialTransporter struct {
 }
 
 func (mb *rtuSerialTransporter) Send(aduRequest []byte) (aduResponse []byte, err error) {
+	mb.serialPort.mu.Lock()
+	defer mb.serialPort.mu.Unlock()
+
 	// Make sure port is connected
 	if err = mb.serialPort.connect(); err != nil {
 		return

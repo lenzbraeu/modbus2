@@ -82,7 +82,7 @@ type ProtocolDataUnit struct {
 
 // Packager specifies the communication layer.
 type Packager interface {
-	Encode(pdu *ProtocolDataUnit) (adu []byte, err error)
+	Encode(slaveID byte, pdu *ProtocolDataUnit) (adu []byte, err error)
 	Decode(adu []byte) (pdu *ProtocolDataUnit, err error)
 	Verify(aduRequest []byte, aduResponse []byte) (err error)
 }
